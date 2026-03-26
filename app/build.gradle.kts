@@ -35,4 +35,6 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.service)
+
+    testImplementation("junit:junit:4.13.2")
 }
