@@ -2,71 +2,60 @@
 
 **DTS Android TPAN Client Service**
 
-An Android background service that provides TPAN (Tactical Proximity Area Network) connectivity between a DTS EUD (TT or TWT) and the DTS Hub.
+An Android foreground service that provides TPAN (Tactical Proximity Area Network) connectivity between a DTS EUD (TT or TWT) and the DTS Hub.
 
-It establishes a Bluetooth SPP (RFCOMM) connection to `tpan-bt-manager` running on the Hub, authenticates with mTLS using the device's Root PKI identity, and exposes a local **SOCKS5H proxy** (or Per-App VPN) so that applications on the EUD can reach Hub container services without any direct network interface configuration.
-
-This service is the Android port of the `tpan-bt-client` from the TNN prototype.
-See [`AGENT.md`](AGENT.md) for agentic porting guidance from the prototype.
+Authoritative design reference: [`docs/swad-dts/designs/svc-tpan-architecture.md`](../../docs/swad-dts/designs/svc-tpan-architecture.md)
 
 ## Architecture
 
+`service-tpan-android` uses Android `VpnService` to create a TUN interface with the EUD's stable IP address and carries framed IP packets over the highest-priority enabled bearer. Applications connect to Hub services using normal IP sockets — TPAN is invisible to all apps.
+
 ```
-┌─────────────────────────────────── EUD (TT / TWT) ──────────────────────────────────┐
+┌──────────────────────────────────── EUD (TT / TWT) ─────────────────────────────────┐
 │                                                                                       │
 │  ┌─────────────────────────────────────────────────────────────────────────────────┐ │
-│  │                         TpanService (Android Foreground Service)                │ │
+│  │                     TpanService (Android Foreground Service)                    │ │
 │  │                                                                                  │ │
-│  │   ┌─────────────────────────────────┐   ┌──────────────────────────────────┐   │ │
-│  │   │  tpan_client (C++ NDK)           │   │  SOCKS5H Server (loopback :1080) │   │ │
-│  │   │  - RFCOMM connect to Hub         │◄──►  (or Per-App VPN)               │   │ │
-│  │   │  - mTLS handshake (Root PKI)     │   └──────────────────────────────────┘   │ │
-│  │   │  - TPAN Control Protocol         │             ▲                             │ │
-│  │   └──────────────┬──────────────────┘             │                             │ │
-│  └──────────────────┼─────────────────────────────────┼─────────────────────────────┘ │
-│                     │ Bluetooth SPP (RFCOMM)          │ App traffic (SOCKS5H)          │
-└─────────────────────┼─────────────────────────────────┼───────────────────────────────┘
-                      │                           ┌──────┴──────────────────────┐
-                      │                           │  DTS Applications           │
-                      │                           │  (SITAWARE, KATIM apps)     │
-                      ▼                           └─────────────────────────────┘
-              tpan-bt-manager (Hub)
-              192.168.101.35
+│  │   ┌──────────────┐   ┌──────────────┐   ┌─────────────────────────────────┐   │ │
+│  │   │  VPN Engine   │   │ Frame Codec  │   │  Transport Layer (pluggable)    │   │ │
+│  │   │  VpnService   │◄──►  3-byte      │◄──►  BT SPP (RFCOMM)              │   │ │
+│  │   │  TUN fd r/w   │   │  DATA/KA/SD  │   │  UWB (future)                 │   │ │
+│  │   │  Stable IP    │   │              │   │  WiFi (future)                 │   │ │
+│  │   └──────────────┘   └──────────────┘   └─────────────────────────────────┘   │ │
+│  │                                                      ▲                         │ │
+│  │   ┌──────────────────────┐   ┌──────────────────────┴──────┐                  │ │
+│  │   │  Provisioning Store   │   │  Bearer Monitor              │                  │ │
+│  │   │  USB file-drop        │──►│  USB > UWB > WiFi > BT       │                  │ │
+│  │   │  active/previous      │   │  stability hold on fail-up   │                  │ │
+│  │   └──────────────────────┘   └─────────────────────────────┘                  │ │
+│  └──────────────────────────────────────────────────────────────────────────────────┘ │
+│                     │ Wireless bearer                    ▲ App traffic                 │
+└─────────────────────┼────────────────────────────────────┼────────────────────────────┘
+                      ▼                              ┌─────┴──────────────────┐
+              tpan-bt-manager (Hub)                  │  DTS Applications      │
+              192.168.101.35                         │  (normal IP sockets)   │
+                                                     └────────────────────────┘
 ```
 
 ## Repository Structure
 
 ```
 service-tpan-android/
-├── AGENT.md                        # Agentic porting guidance (from tpan-over-bt)
+├── AGENT.md                        # Architecture reference and build guidance
 ├── app/
 │   ├── build.gradle.kts
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── AndroidManifest.xml
-│   │   │   ├── cpp/
-│   │   │   │   ├── CMakeLists.txt
-│   │   │   │   ├── tpan_client.cpp     # C++ TPAN client core (RFCOMM + mTLS)
-│   │   │   │   └── socks5h_server.cpp  # SOCKS5H proxy server
-│   │   │   └── java/com/katim/dts/tpan/
-│   │   │       ├── TpanService.kt      # Android foreground service
-│   │   │       ├── TpanBootReceiver.kt # Auto-start on boot
-│   │   │       └── TpanManager.kt      # JNI bridge + connection state
-│   │   └── test/
+│   └── src/main/
+│       ├── AndroidManifest.xml
+│       └── java/com/katim/dts/tpan/
+│           ├── TpanService.kt      # Foreground service lifecycle
+│           └── TpanBootReceiver.kt # Auto-start on boot
 ├── build.gradle.kts
 └── settings.gradle.kts
 ```
 
-## Porting Reference
+## Mission Planning Integration
 
-The prototype to port from is in the TNN repository:
-[`tpan-over-bt`](https://bitbucket.katim.com/projects/TNN/repos/tpan-over-bt/browse)
-
-Key files to port:
-- `tpan-bt-client/` → `app/src/main/cpp/tpan_client.cpp`
-- SOCKS5H server → `app/src/main/cpp/socks5h_server.cpp`
-
-See `AGENT.md` in both repos for porting guidance. The C++ core builds via Android NDK (CMake).
+The provisioning bundle is delivered via USB from the Mission Planning tool. The canonical bundle shape is defined in `svc-tpan-architecture.md` §EUD-Side Bundle. The Android-side importer validates, persists (active + previous slots), and auto-starts TPAN according to bundle policy.
 
 ## Build
 
@@ -74,7 +63,7 @@ See `AGENT.md` in both repos for porting guidance. The C++ core builds via Andro
 ./gradlew assembleDebug
 ```
 
-NDK must be installed. See `app/src/main/cpp/CMakeLists.txt` for C++ build configuration.
+No NDK required. Pure Kotlin/Android SDK project.
 
 ## Deployment
 
@@ -83,15 +72,17 @@ NDK must be installed. See `app/src/main/cpp/CMakeLists.txt` for C++ build confi
 | TT (Tactical Terminal) | BT SPP (RFCOMM) | When USB not connected |
 | TWT (Wrist Terminal) | BT SPP (RFCOMM) | When USB not connected; no PANU dependency |
 
-The service auto-starts on boot via `TpanBootReceiver` and is a foreground service with a persistent notification.
+The service auto-starts on boot via `TpanBootReceiver` and runs as a foreground service with a persistent notification.
 
 ## Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| TpanService (Android) | Scaffolded | Foreground service skeleton |
-| TpanBootReceiver | Scaffolded | Boot auto-start |
-| tpan_client.cpp (NDK) | Stub | Port from `tpan-over-bt` |
-| socks5h_server.cpp (NDK) | Stub | Port from `tpan-over-bt` |
-| mTLS (Root PKI) | Planned | Integrate with DTS PKI |
-| Per-App VPN mode | Planned | Alternative to SOCKS5H for transparent proxying |
+| TpanService (foreground service) | Scaffold | Lifecycle shell, notification management |
+| TpanBootReceiver | Ready | Boot auto-start |
+| VPN Engine (VpnService + TUN) | Planned | Transparent IP capture — Epic 3 |
+| Frame Codec (Kotlin) | Planned | 3-byte frame protocol — Epic 2 |
+| BT Transport (RFCOMM) | Planned | BluetoothSocket to Hub SPP profile — Epic 4 |
+| Provisioning Store | Planned | USB file-drop, dual-slot, boot validation — Epic 5 |
+| Bearer Monitor | Planned | USB detection, priority selection — Epic 6 |
+| Integration + Lifecycle | Planned | KEEPALIVE, reconnection, auto-start — Epic 7 |
