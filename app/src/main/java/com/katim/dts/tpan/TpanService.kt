@@ -3,10 +3,11 @@ package com.katim.dts.tpan
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.Service
 import android.content.Intent
+import android.net.VpnService
 import android.os.IBinder
 import android.util.Log
+import com.katim.dts.tpan.vpn.VpnEngine
 
 /**
  * TPAN foreground service.
@@ -21,7 +22,7 @@ import android.util.Log
  *
  * Authoritative design: docs/swad-dts/designs/svc-tpan-architecture.md
  */
-class TpanService : Service() {
+class TpanService : VpnService() {
 
     companion object {
         private const val TAG = "TpanService"
@@ -29,8 +30,13 @@ class TpanService : Service() {
         private const val NOTIFICATION_ID = 1001
     }
 
+    /** VPN Engine — manages TUN interface and data-path relay. */
+    lateinit var vpnEngine: VpnEngine
+        private set
+
     override fun onCreate() {
         super.onCreate()
+        vpnEngine = VpnEngine(this)
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Idle"))
     }
@@ -47,7 +53,8 @@ class TpanService : Service() {
 
     override fun onDestroy() {
         Log.i(TAG, "onDestroy")
-        // TODO (Epic 7): ordered shutdown — transport → VPN → Bearer Monitor
+        vpnEngine.deactivateVpn()
+        // TODO (Epic 7): ordered shutdown — transport → Bearer Monitor
         super.onDestroy()
     }
 
