@@ -8,7 +8,7 @@ Authoritative design reference: [`docs/swad-dts/designs/svc-tpan-architecture.md
 
 ## Architecture
 
-`service-tpan-android` uses Android `VpnService` to create a TUN interface with the EUD's stable IP address and carries framed IP packets over the highest-priority enabled bearer. Applications connect to Hub services using normal IP sockets — TPAN is invisible to all apps.
+`service-tpan-android` uses Android `VpnService` to create a TUN interface with the EUD's stable IP address and carries framed IP packets over the highest-priority enabled bearer. Applications connect to Hub services using normal IP sockets -- TPAN is invisible to all apps.
 
 ```
 ┌──────────────────────────────────── EUD (TT / TWT) ─────────────────────────────────┐
@@ -53,9 +53,19 @@ service-tpan-android/
 └── settings.gradle.kts
 ```
 
-## Mission Planning Integration
+## USB Commissioning
 
-The provisioning bundle is delivered via USB from the Mission Planning tool. The canonical bundle shape is defined in `svc-tpan-architecture.md` §EUD-Side Bundle. The Android-side importer validates, persists (active + previous slots), and auto-starts TPAN according to bundle policy.
+TPAN is mission-agnostic. When plugged into a Hub via USB, the service
+automatically discovers the Hub on the Internal Zone and calls the USB
+commissioning endpoint. The Hub responds with its BT identity and a one-time
+pairing passkey. BT pairing proceeds automatically. No user interaction or
+Mission Planning Tool involvement is needed.
+
+The service auto-commissions on USB plug or on service start when USB is already
+connected. Commissioning state persists across reboots and power loss (active +
+previous slots in Android internal storage).
+
+See `svc-tpan-architecture.md` for the full USB commissioning design.
 
 ## Build
 
@@ -80,9 +90,24 @@ The service auto-starts on boot via `TpanBootReceiver` and runs as a foreground 
 |-----------|--------|-------|
 | TpanService (foreground service) | Scaffold | Lifecycle shell, notification management |
 | TpanBootReceiver | Ready | Boot auto-start |
-| VPN Engine (VpnService + TUN) | Planned | Transparent IP capture — Epic 3 |
-| Frame Codec (Kotlin) | Planned | 3-byte frame protocol — Epic 2 |
-| BT Transport (RFCOMM) | Planned | BluetoothSocket to Hub SPP profile — Epic 4 |
-| Provisioning Store | Planned | USB file-drop, dual-slot, boot validation — Epic 5 |
-| Bearer Monitor | Planned | USB detection, priority selection — Epic 6 |
-| Integration + Lifecycle | Planned | KEEPALIVE, reconnection, auto-start — Epic 7 |
+| USB commissioning client | TODO | Auto-detect Internal Zone USB, call commission endpoint, persist response |
+| VPN Engine (VpnService + TUN) | Planned | Transparent IP capture |
+| Frame Codec (Kotlin) | Planned | 3-byte frame protocol |
+| BT Transport (RFCOMM) | Planned | BluetoothSocket to Hub SPP profile with passkey pairing |
+| Provisioning Store | Planned | Dual-slot persistence for USB commission data, boot validation |
+| Bearer Monitor | Planned | USB detection, priority selection, VPN activation |
+| Integration + Lifecycle | Planned | KEEPALIVE, reconnection, auto-start |
+
+## Open Dependencies
+
+| ID | Dependency | Priority |
+| -- | ---------- | -------- |
+| TPAN-A1 | Implement VPN Engine (VpnService + TUN): transparent IP capture | Critical |
+| TPAN-A2 | Implement Frame Codec (Kotlin): 3-byte frame protocol | Critical |
+| TPAN-A3 | Implement BT Transport (RFCOMM): BluetoothSocket to Hub SPP profile | Critical |
+| TPAN-A4 | Implement USB commissioning client: auto-detect Internal Zone USB (on plug and on service start), call commission endpoint, persist response | Critical |
+| TPAN-A5 | Implement auto-pairing with USB-exchanged passkey (KATIM privileged build auto-confirm) | Critical |
+| TPAN-A6 | Implement Bearer Monitor: USB detection, priority selection, VPN activation | High |
+| TPAN-A7 | Implement Provisioning Store: dual-slot persistence, boot-time validation | High |
+| TPAN-A8 | Implement reconnection with exponential backoff (1s..30s) | High |
+| TPAN-A9 | Integrate Root PKI mTLS into provisioning | Medium |
