@@ -1,152 +1,141 @@
 # service-tpan-android
 
-**DTS Android TPAN Client Service**
+Android TPAN client service for TT and TWT EUDs.
 
-An Android foreground service that provides transparent IP connectivity between
-a DTS EUD (TT or TWT) and the DTS Hub over TPAN. Uses Android `VpnService` to
-create a TUN interface with the EUD's stable IP address and carries framed IP
-packets over the highest-priority available bearer. Applications connect to Hub
-services using normal IP sockets -- TPAN is invisible to all apps.
+`service-tpan-android` is a mission-agnostic foreground service that persists
+USB commission state, bonds to the Hub over Bluetooth, and provides the TPAN
+framed-IP data path through Android `VpnService`. USB is always preferred over
+Bluetooth in this pass; UWB and WiFi remain future transports.
 
 Authoritative design reference:
 [`docs/swad-dts/designs/svc-tpan-architecture.md`](../../docs/swad-dts/designs/svc-tpan-architecture.md)
 
 ## Architecture
 
-```
-+--------------------------------- EUD (TT / TWT) --------------------------------+
-|                                                                                   |
-|  +-----------------------------------------------------------------------------+ |
-|  |                  TpanService (Android Foreground Service)                    | |
-|  |                                                                              | |
-|  |  +--------------+  +--------------+  +----------------------------------+   | |
-|  |  | VPN Engine   |  | Frame Codec  |  | Transport Layer (pluggable)      |   | |
-|  |  | VpnService   |  | 3-byte       |  | BT SPP (RFCOMM) -- implemented  |   | |
-|  |  | TUN fd r/w   |  | DATA/KA/SD   |  | UWB (future)                    |   | |
-|  |  | Stable IP    |  |              |  | WiFi (future)                    |   | |
-|  |  +--------------+  +--------------+  +----------------------------------+   | |
-|  |                                                     ^                        | |
-|  |  +-----------------------+  +-----------------------+-----+                  | |
-|  |  | Provisioning Store    |  | Bearer Monitor               |                 | |
-|  |  | USB file-drop         |->| USB > UWB > WiFi > BT        |                 | |
-|  |  | active/previous       |  | stability hold on fail-up    |                 | |
-|  |  +-----------------------+  +---+--------------------------+                  | |
-|  |                                 |                                             | |
-|  |  +-----------------------+  +---v--------------------------+                  | |
-|  |  | Bundle Importer       |  | Connection Manager            |                 | |
-|  |  | FileObserver on USB   |  | KEEPALIVE 1s / 3-miss dead   |                 | |
-|  |  | import dir            |  | reconnect backoff 1s..30s    |                 | |
-|  |  +-----------------------+  +------------------------------+                  | |
-|  +-----------------------------------------------------------------------------+ |
-|                    | Wireless bearer                   ^ App traffic              |
-+--------------------+-----------------------------------+--------------------------+
-                     v                             +-----+-------------------+
-             tpan-bt-manager (Hub)                 |  DTS Applications       |
-             192.168.101.35                        |  (normal IP sockets)    |
-                                                   +-------------------------+
+```text
++-------------------------------- EUD --------------------------------+
+|                                                                     |
+|  +---------------------------------------------------------------+  |
+|  | TpanService                                                   |  |
+|  |                                                               |  |
+|  |  UsbNetworkMonitor  -> UsbCommissionClient -> Provisioning    |  |
+|  |          |                                   Store            |  |
+|  |          v                                                     |  |
+|  |     BondManager  -> BtTransport -> ConnectionManager -> VPN   |  |
+|  |                                            ^            |      |  |
+|  |                                            +-- FrameCodec --+  |  |
+|  +---------------------------------------------------------------+  |
+|                                                                     |
++---------------------------------------------------------------------+
 ```
 
 ## Repository Structure
 
-```
+```text
 service-tpan-android/
-+-- AGENT.md                                    # Architecture reference
-+-- build.gradle.kts                            # Root build config
-+-- settings.gradle.kts                         # Module declaration
-+-- gradle.properties
-+-- gradle/libs.versions.toml                   # Dependency version catalog
-+-- app/
-    +-- build.gradle.kts                        # App module: SDK 34, minSdk 29
-    +-- src/
-        +-- main/
-        |   +-- AndroidManifest.xml
-        |   +-- java/com/katim/dts/tpan/
-        |       +-- TpanService.kt              # Foreground service orchestrator
-        |       +-- TpanBootReceiver.kt         # Auto-start on boot
-        |       +-- ConnectionManager.kt        # KEEPALIVE timer, link-dead, reconnect backoff
-        |       +-- vpn/
-        |       |   +-- VpnEngine.kt            # VpnService TUN creation, IP packet relay
-        |       +-- codec/
-        |       |   +-- FrameType.kt            # DATA(0x00), KEEPALIVE(0x01), SHUTDOWN(0x02)
-        |       |   +-- Frame.kt                # Immutable frame data class
-        |       |   +-- FrameCodec.kt           # 3-byte wire protocol encoder/decoder
-        |       +-- transport/
-        |       |   +-- TpanTransport.kt        # Pluggable transport interface
-        |       |   +-- BtTransport.kt          # BluetoothSocket RFCOMM implementation
-        |       +-- bearer/
-        |       |   +-- BearerMonitor.kt        # USB detection, bearer priority, VPN control
-        |       +-- provision/
-        |           +-- TpanBundle.kt           # Commission bundle data class (JSON)
-        |           +-- ProvisioningStore.kt    # Dual-slot persistence, import, rollback
-        |           +-- BundleImporter.kt       # FileObserver on USB import directory
-        +-- test/java/com/katim/dts/tpan/
-            +-- codec/
-            |   +-- FrameCodecTest.kt           # Wire format, round-trip, partial reads, errors
-            +-- provision/
-            |   +-- TpanBundleTest.kt           # JSON parsing, validation
-            +-- bearer/
-                +-- BearerSelectorTest.kt       # Bearer priority filtering
++-- app/src/main/java/com/katim/dts/tpan/
+|   +-- TpanService.kt                    # Foreground service orchestrator
+|   +-- TpanBootReceiver.kt               # Boot start from commission state
+|   +-- ConnectionManager.kt              # KEEPALIVE, SHUTDOWN, reconnect backoff
+|   +-- bearer/BearerMonitor.kt           # Fixed USB > BT bearer behavior
+|   +-- codec/Frame*.kt                   # 3-byte TPAN framing
+|   +-- provision/
+|   |   +-- UsbCommissionRecord.kt        # Persisted commission payload
+|   |   +-- RuntimeTpanConfig.kt          # Effective runtime view
+|   |   +-- ProvisioningStore.kt          # active/previous/staging internal store
+|   |   +-- UsbNetworkMonitor.kt          # Stable USB detection
+|   |   +-- UsbCommissionClient.kt        # POST /api/v1/commission/usb
+|   |   +-- BondManager.kt                # Bond maintenance and pairing assist
+|   |   +-- LocalBluetoothIdentityProvider.kt
+|   +-- transport/BtTransport.kt          # RFCOMM SPP transport
+|   +-- vpn/VpnEngine.kt                  # Android VpnService TUN lifecycle
++-- app/src/test/java/com/katim/dts/tpan/
+    +-- codec/FrameCodecTest.kt
+    +-- provision/UsbCommissionRecordTest.kt
+    +-- provision/ProvisioningStoreTest.kt
 ```
+
+## Runtime Model
+
+The service runs from `UsbCommissionRecord` only. There is no mission bundle,
+overlay, callsign, mission ID, or `autoStartTpan` flag.
+
+Persisted commission state contains:
+
+- `hub.btMac`
+- `hub.profileUuid`
+- `pairingPasskey`
+- `localEud.btMac`
+- `localEud.role`
+- `localEud.tunAddress`
+- `commissionedAt`
+
+Boot behavior:
+
+- If a valid active commission record exists, `TpanBootReceiver` starts the service.
+- If the active record is broken but `previous` is valid, the store rolls back on boot.
+- If only `staging` is valid after an interrupted write, the store promotes it on boot.
 
 ## USB Commissioning
 
-TPAN is mission-agnostic. When plugged into a Hub via USB, the service
-automatically discovers the Hub on the Internal Zone and calls the USB
-commissioning endpoint. The Hub responds with its BT identity and a one-time
-pairing passkey. BT pairing proceeds automatically. No user interaction or
-Mission Planning Tool involvement is needed.
+When the EUD sees a stable USB network, it:
 
-The service auto-commissions on USB plug or on service start when USB is already
-connected. Commissioning state persists across reboots and power loss (active +
-previous slots in Android internal storage).
+1. Resolves the local BT MAC.
+2. Calls `http://192.168.101.35:8002/api/v1/commission/usb` over that USB `Network`.
+3. Persists the returned commission record internally.
+4. Removes the old Hub bond if the Hub identity changed.
+5. Initiates pairing only when the Hub bond is missing.
+6. Rebuilds runtime state from the persisted commission record.
 
-See `svc-tpan-architecture.md` for the full USB commissioning design.
+Retry behavior:
 
-## Build
+- Immediate attempt on stable USB-up and on service start if USB is already present.
+- Exponential backoff while USB remains up: `1s -> 2s -> 4s -> 8s -> 16s -> 30s`.
+
+Dev fallback:
+
+- Production/privileged builds use the real local BT adapter MAC.
+- Non-privileged builds require `/sdcard/DTS/tpan-dev/local-bt-mac.txt`.
+- Without a real local BT MAC, the service stays in USB-active commission retry mode and logs the requirement.
+
+## Bearer and Pairing Rules
+
+- Effective bearer behavior is fixed to `USB > BT`.
+- When USB is stable, VPN is deactivated and traffic stays on USB.
+- When USB drops, the service activates the TPAN VPN and reconnects over BT.
+- Same-MAC re-commission rotates the stored passkey even if the bond is kept.
+- If the bond is already present, the service does not force `createBond()`.
+- If the bond is missing, pairing uses the most recently stored passkey.
+
+## Build and Test
 
 ```bash
 ./gradlew assembleDebug
+./gradlew testDebugUnitTest
 ```
 
-No NDK required. Pure Kotlin/Android SDK project (compileSdk 34, minSdk 29,
-targetSdk 34, Java 17).
-
-## Deployment
-
-| EUD | Transport | Notes |
-|-----|-----------|-------|
-| TT (Tactical Terminal) | BT SPP (RFCOMM) | When USB not connected |
-| TWT (Wrist Terminal) | BT SPP (RFCOMM) | When USB not connected; no PANU dependency |
-
-The service auto-starts on boot via `TpanBootReceiver` if a valid provisioning
-bundle exists and `autoStartTpan` is true. Runs as a foreground service with
-a persistent notification.
+No NDK is required. The project is Kotlin-only with `compileSdk 34`, `minSdk 29`,
+and Java 17 toolchains.
 
 ## Status
 
 | Component | Status | Notes |
-|-----------|--------|-------|
-| TpanService | Implemented | Foreground service lifecycle, component wiring, ordered shutdown, live re-provisioning on bundle import |
-| TpanBootReceiver | Implemented | Boot auto-start with provisioning validation (`autoStartTpan` flag) |
-| VPN Engine (VpnService + TUN) | Implemented | TUN creation, stable IP, bidirectional IP relay, socket protection |
-| Frame Codec (3-byte) | Implemented | DATA/KEEPALIVE/SHUTDOWN, partial-read handling, synchronized writes |
-| BT Transport (RFCOMM) | Implemented | BluetoothSocket SPP, disconnect callback, no VPN capture needed (L2CAP) |
-| Bearer Monitor | Implemented | USB detection via ConnectivityManager, bearer priority filtering, VPN activation/deactivation, 2s stability hold on USB up |
-| Connection Manager | Implemented | KEEPALIVE timer (1s), link-dead detection (3s/3-miss), graceful SHUTDOWN, exponential backoff reconnection (1s..30s) |
-| Provisioning Store | Implemented | Dual-slot persistence (active/previous), staging-then-promote import, boot-time validation with rollback |
-| Bundle Importer | Implemented | FileObserver on `/sdcard/DTS/tpan-import/`, pending checks on start, rollback trigger support |
-| TpanBundle | Implemented | JSON parsing, schema validation, immutable data class with nested structures |
-| USB commissioning client | TODO | Auto-detect Internal Zone USB, call Hub commission endpoint, persist BT identity + passkey |
-| Auto-pairing with passkey | TODO | Use USB-exchanged passkey for BT bond (KATIM privileged build auto-confirm) |
-| UWB transport | Planned | Stubbed in TpanService.connectTransportForBearer() |
-| WiFi transport | Planned | Stubbed in TpanService.connectTransportForBearer() |
-| Root PKI mTLS | Planned | Bundle carries `security.mtlsRequired` flag but not yet integrated |
+| ---- | ---- | ---- |
+| TpanService | Implemented | Mission-agnostic service lifecycle and runtime restart |
+| TpanBootReceiver | Implemented | Starts from valid commission state only |
+| ProvisioningStore | Implemented | Internal active/previous/staging persistence with boot recovery |
+| UsbNetworkMonitor | Implemented | Stable USB detection |
+| UsbCommissionClient | Implemented | Hub USB commission POST over bound `Network` |
+| LocalBluetoothIdentityProvider | Implemented | Privileged MAC path plus dev override |
+| BondManager | Implemented | Hub bond replacement and pairing confirmation |
+| VPN Engine | Implemented | Stable TUN addressing and framed IP relay |
+| BT transport | Implemented | RFCOMM SPP with reconnect handled above the transport |
+| Connection Manager | Implemented | KEEPALIVE, SHUTDOWN, reconnect backoff |
+| UWB transport | Planned | Not implemented in this pass |
+| WiFi transport | Planned | Not implemented in this pass |
+| Root PKI mTLS | Out of scope | Not part of this pass |
 
-## Open Dependencies
+## References
 
-| ID | Dependency | Priority |
-| -- | ---------- | -------- |
-| TPAN-A1 | Implement USB commissioning client: auto-detect Internal Zone USB, call Hub commission endpoint, persist response | Critical |
-| TPAN-A2 | Implement auto-pairing with USB-exchanged passkey (KATIM privileged build auto-confirm) | Critical |
-| TPAN-A3 | End-to-end integration testing with `tpan-bt-manager` on TT and TWT hardware | Critical |
-| TPAN-A4 | Integrate Root PKI mTLS into transport layer | Medium |
+- [`svc-tpan-architecture.md`](../../docs/swad-dts/designs/svc-tpan-architecture.md)
+- [`icd-footprint-android-api.md`](../../docs/swad-dts/specifications/icd-footprint-android-api.md)

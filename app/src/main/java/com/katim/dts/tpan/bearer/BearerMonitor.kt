@@ -8,7 +8,7 @@ import android.net.NetworkRequest
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.katim.dts.tpan.provision.TpanBundle
+import com.katim.dts.tpan.provision.RuntimeTpanConfig
 import com.katim.dts.tpan.transport.TpanTransport
 import com.katim.dts.tpan.vpn.VpnEngine
 import java.io.IOException
@@ -19,11 +19,9 @@ import java.io.IOException
  * Monitors USB interface state via [ConnectivityManager.NetworkCallback].
  * When USB is active and stable (2 s hold), VPN is deactivated and apps
  * route directly over USB. When USB goes down, VPN is activated immediately
- * and the best wireless transport is selected by bearer policy priority.
+ * and the best wireless transport is selected by fixed TPAN policy.
  *
- * Bearer capability priority when enabled: **USB > UWB > WiFi > BT**.
- * Current security policy may disable WiFi; `disabledBearers` from the
- * provisioning bundle controls which bearers are skipped.
+ * Current implementation is mission-agnostic and fixed to **USB > BT**.
  *
  * See svc-tpan-architecture.md §Bearer State Machine (lines 276–351),
  * §Bearer Switching (lines 678–717).
@@ -31,7 +29,7 @@ import java.io.IOException
 class BearerMonitor(
     private val context: Context,
     private val vpnEngine: VpnEngine,
-    private val bundle: TpanBundle
+    private val runtimeConfig: RuntimeTpanConfig
 ) {
     companion object {
         private const val TAG = "BearerMonitor"
@@ -199,7 +197,7 @@ class BearerMonitor(
     private fun transitionToWireless() {
         Log.i(TAG, "Transitioning to wireless — activating VPN")
 
-        val eudIp = bundle.localEud.tunAddress
+        val eudIp = runtimeConfig.tunAddress
         if (!vpnEngine.isActive) {
             if (!vpnEngine.activateVpn(eudIp)) {
                 Log.e(TAG, "Failed to activate VPN")
@@ -215,14 +213,11 @@ class BearerMonitor(
     // ── Bearer priority selector (A602) ─────────────────────────────────────
 
     /**
-     * Select the best available wireless bearer from the provisioning bundle's
-     * bearer policy. Filters out disabled bearers, returns in priority order.
+     * Current mission-agnostic implementation always prefers BT when USB
+     * is not active.
      */
     fun selectBearers(): List<String> {
-        val disabled = bundle.bearerPolicy.disabledBearers.toSet()
-        return bundle.bearerPolicy.priority
-            .filter { it != "usb" }            // USB handled separately
-            .filter { it !in disabled }
+        return listOf("bt")
     }
 
     // ── Transport lifecycle (A605) ──────────────────────────────────────────
