@@ -72,6 +72,7 @@ class VpnEngine(private val service: VpnService) {
             service.Builder()
                 .addAddress(eudIp, 32)
                 .addRoute(TPAN_SUBNET, TPAN_PREFIX)
+                .addRoute("224.0.0.0", 4)   // multicast — SITAWARE/STC COP distribution
                 .setMtu(MTU)
                 .setBlocking(true)
                 .setSession("TPAN")
