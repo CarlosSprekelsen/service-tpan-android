@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Network
 import android.net.VpnService
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import com.katim.dts.tpan.bearer.BearerMonitor
 import com.katim.dts.tpan.provision.BondManager
@@ -80,6 +81,7 @@ class TpanService : VpnService() {
 
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Awaiting USB commission"))
+        checkBatteryOptimization()
         bondManager.start()
         configureUsbCommissioning()
     }
@@ -315,6 +317,25 @@ class TpanService : VpnService() {
             BearerMonitor.State.WIRELESS_ACTIVE -> "Connected via BT"
             BearerMonitor.State.RECONNECTING -> "Reconnecting..."
             else -> "Idle"
+        }
+    }
+
+    /**
+     * Logs a warning if battery optimizations are active for this package.
+     *
+     * On a correctly configured KATIM build the package is in the platform power
+     * whitelist (power_whitelist_platform.xml) and this warning never appears.
+     * On bench or CI builds without that whitelist entry, Doze mode may suspend
+     * KEEPALIVE delivery, causing the Hub to declare the link dead during idle
+     * periods. See svc-tpan-architecture.md §Battery Optimization Exemption.
+     */
+    private fun checkBatteryOptimization() {
+        val pm = getSystemService(PowerManager::class.java)
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            Log.w(TAG, "Battery optimizations are active for $packageName. " +
+                "Doze mode may suspend KEEPALIVE frames and cause link interruptions. " +
+                "Add the package to power_whitelist_platform.xml on KATIM builds, " +
+                "or disable battery optimization manually for bench testing.")
         }
     }
 

@@ -22,6 +22,9 @@
     <!-- Network state (USB interface detection for bearer monitor) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Battery optimization exemption check (startup warning if not whitelisted on platform) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:label="TPAN Service"
         android:persistent="true">
