@@ -3,9 +3,9 @@ package com.katim.dts.tpan
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.Service
 import android.content.Intent
 import android.net.Network
-import android.net.VpnService
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -17,9 +17,9 @@ import com.katim.dts.tpan.provision.RuntimeTpanConfig
 import com.katim.dts.tpan.provision.UsbCommissionClient
 import com.katim.dts.tpan.provision.UsbCommissionRecord
 import com.katim.dts.tpan.provision.UsbNetworkMonitor
+import com.katim.dts.tpan.tap.TapEngine
 import com.katim.dts.tpan.transport.BtTransport
 import com.katim.dts.tpan.transport.TpanTransport
-import com.katim.dts.tpan.vpn.VpnEngine
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -34,8 +34,11 @@ import java.util.concurrent.TimeUnit
  * The service persists USB commissioning state, manages the Hub bond,
  * commissions over the stable USB link, and activates the BT data path
  * when USB is unavailable.
+ *
+ * Runs as root on KATIM builds — creates TAP device directly via
+ * TUNSETIFF ioctl (JNI). No VpnService, no consent dialog.
  */
-class TpanService : VpnService() {
+class TpanService : Service() {
 
     companion object {
         private const val TAG = "TpanService"
@@ -44,7 +47,7 @@ class TpanService : VpnService() {
         private val COMMISSION_RETRY_DELAYS_MS = longArrayOf(1000, 2000, 4000, 8000, 16000, 30000)
     }
 
-    private lateinit var vpnEngine: VpnEngine
+    private lateinit var tapEngine: TapEngine
     private lateinit var provisioningStore: ProvisioningStore
     private lateinit var usbNetworkMonitor: UsbNetworkMonitor
     private lateinit var usbCommissionClient: UsbCommissionClient
@@ -70,7 +73,7 @@ class TpanService : VpnService() {
     override fun onCreate() {
         super.onCreate()
 
-        vpnEngine = VpnEngine(this)
+        tapEngine = TapEngine()
         provisioningStore = ProvisioningStore(File(filesDir, ProvisioningStore.ROOT_DIR))
         usbNetworkMonitor = UsbNetworkMonitor(this)
         usbCommissionClient = UsbCommissionClient()
@@ -205,8 +208,8 @@ class TpanService : VpnService() {
 
         stopRuntime()
 
-        val connection = ConnectionManager(vpnEngine)
-        val monitor = BearerMonitor(this, vpnEngine, runtimeConfig)
+        val connection = ConnectionManager(tapEngine)
+        val monitor = BearerMonitor(this, tapEngine, runtimeConfig)
         connectionManager = connection
         bearerMonitor = monitor
 
@@ -243,7 +246,7 @@ class TpanService : VpnService() {
             }
         }
 
-        vpnEngine.onShutdownReceived = {
+        tapEngine.onShutdownReceived = {
             Log.i(TAG, "Peer sent SHUTDOWN - reconnecting current runtime")
             connection.stopDataPath()
             monitor.disconnectTransport()
@@ -261,7 +264,7 @@ class TpanService : VpnService() {
         connectionManager?.destroy()
         bearerMonitor = null
         connectionManager = null
-        vpnEngine.onShutdownReceived = null
+        tapEngine.onShutdownReceived = null
     }
 
     private fun ensureBond(record: UsbCommissionRecord) {

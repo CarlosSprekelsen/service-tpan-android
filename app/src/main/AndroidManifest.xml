@@ -16,8 +16,8 @@
     <!-- Boot auto-start -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- VpnService TUN interface for transparent IP tunnel -->
-    <uses-permission android:name="android.permission.BIND_VPN_SERVICE" />
+    <!-- Root TAP device via JNI (requires root or CAP_NET_ADMIN on KATIM builds) -->
+    <!-- BIND_VPN_SERVICE permission retained for potential fallback but service no longer extends VpnService -->
 
     <!-- Network state (USB interface detection for bearer monitor) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -32,11 +32,7 @@
         <service
             android:name=".TpanService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice"
-            android:permission="android.permission.BIND_VPN_SERVICE">
-            <intent-filter>
-                <action android:name="android.net.VpnService" />
-            </intent-filter>
+            android:foregroundServiceType="connectedDevice">
         </service>
 
         <receiver

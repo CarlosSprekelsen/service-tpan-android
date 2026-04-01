@@ -7,7 +7,7 @@ package com.katim.dts.tpan.codec
  * See svc-tpan-architecture.md §Framing Protocol.
  */
 enum class FrameType(val wire: Byte) {
-    /** Raw IPv4 packet. */
+    /** Raw Ethernet frame. */
     DATA(0x00),
     /** Link health probe — empty payload, sent every 1 s. */
     KEEPALIVE(0x01),

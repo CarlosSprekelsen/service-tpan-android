@@ -10,15 +10,15 @@ import android.os.Looper
 import android.util.Log
 import com.katim.dts.tpan.provision.RuntimeTpanConfig
 import com.katim.dts.tpan.transport.TpanTransport
-import com.katim.dts.tpan.vpn.VpnEngine
+import com.katim.dts.tpan.tap.TapEngine
 import java.io.IOException
 
 /**
- * Bearer Monitor — selects the best available bearer and controls VPN activation.
+ * Bearer Monitor — selects the best available bearer and controls TAP activation.
  *
  * Monitors USB interface state via [ConnectivityManager.NetworkCallback].
- * When USB is active and stable (2 s hold), VPN is deactivated and apps
- * route directly over USB. When USB goes down, VPN is activated immediately
+ * When USB is active and stable (2 s hold), TAP is deactivated and apps
+ * route directly over USB. When USB goes down, TAP is activated immediately
  * and the best wireless transport is selected by fixed TPAN policy.
  *
  * Current implementation is mission-agnostic and fixed to **USB > BT**.
@@ -28,7 +28,7 @@ import java.io.IOException
  */
 class BearerMonitor(
     private val context: Context,
-    private val vpnEngine: VpnEngine,
+    private val tapEngine: TapEngine,
     private val runtimeConfig: RuntimeTpanConfig
 ) {
     companion object {
@@ -38,11 +38,11 @@ class BearerMonitor(
 
     /** Current bearer state. */
     enum class State {
-        /** USB cable connected, VPN off, apps route via USB. */
+        /** USB cable connected, TAP off, apps route via USB. */
         USB_ACTIVE,
-        /** Wireless transport active, VPN on. */
+        /** Wireless transport active, TAP on. */
         WIRELESS_ACTIVE,
-        /** All wireless transports lost, VPN TUN stays up, reconnecting. */
+        /** All wireless transports lost, TAP device stays up, reconnecting. */
         RECONNECTING,
         /** Not started. */
         IDLE
@@ -63,7 +63,7 @@ class BearerMonitor(
     /** Callback to request transport connection for a bearer type. */
     var onConnectTransport: ((bearerType: String) -> TpanTransport?)? = null
 
-    /** Callback when VPN + transport are ready for data path. */
+    /** Callback when TAP + transport are ready for data path. */
     var onDataPathReady: ((transport: TpanTransport) -> Unit)? = null
 
     /** Callback when data path should be torn down. */
@@ -100,7 +100,7 @@ class BearerMonitor(
     }
 
     /**
-     * Stop monitoring. Deactivates VPN and disconnects transport.
+     * Stop monitoring. Deactivates TAP and disconnects transport.
      */
     fun stop() {
         if (!running) return
@@ -109,7 +109,7 @@ class BearerMonitor(
         cancelStabilityHold()
         unregisterUsbCallback()
         disconnectTransport()
-        vpnEngine.deactivateVpn()
+        tapEngine.deactivateTap()
         state = State.IDLE
         Log.i(TAG, "Bearer monitor stopped")
     }
@@ -169,7 +169,7 @@ class BearerMonitor(
     }
 
     /**
-     * USB DOWN: immediately activate VPN (no hold on fail-down — speed matters).
+     * USB DOWN: immediately activate TAP (no hold on fail-down — speed matters).
      */
     private fun onUsbDown() {
         if (!running) return
@@ -183,26 +183,26 @@ class BearerMonitor(
         usbStabilityRunnable = null
     }
 
-    // ── VPN activation/deactivation (A604) ──────────────────────────────────
+    // ── TAP activation/deactivation (A604) ────────────────────────────────────
 
     private fun transitionToUsb() {
-        Log.i(TAG, "Transitioning to USB — deactivating VPN")
+        Log.i(TAG, "Transitioning to USB — deactivating TAP")
         onDataPathDown?.invoke()
         disconnectTransport()
-        vpnEngine.deactivateVpn()
+        tapEngine.deactivateTap()
         state = State.USB_ACTIVE
         onStateChanged?.invoke(state, "USB Active")
     }
 
     private fun transitionToWireless() {
-        Log.i(TAG, "Transitioning to wireless — activating VPN")
+        Log.i(TAG, "Transitioning to wireless — activating TAP")
 
-        val eudIp = runtimeConfig.tunAddress
-        if (!vpnEngine.isActive) {
-            if (!vpnEngine.activateVpn(eudIp)) {
-                Log.e(TAG, "Failed to activate VPN")
+        val eudIp = runtimeConfig.tapAddress
+        if (!tapEngine.isActive) {
+            if (!tapEngine.activateTap(eudIp)) {
+                Log.e(TAG, "Failed to activate TAP")
                 state = State.RECONNECTING
-                onStateChanged?.invoke(state, "VPN activation failed")
+                onStateChanged?.invoke(state, "TAP activation failed")
                 return
             }
         }
@@ -261,7 +261,7 @@ class BearerMonitor(
      * Called when the active transport reports a failure.
      *
      * If an alternative transport is available, switch immediately
-     * (VPN TUN stays up). Otherwise, signal reconnect state.
+     * (TAP device stays up). Otherwise, signal reconnect state.
      */
     fun onTransportFailed() {
         if (!running) return

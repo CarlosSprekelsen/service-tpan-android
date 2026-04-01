@@ -12,7 +12,7 @@ data class Frame(
     companion object {
         private val EMPTY = ByteArray(0)
 
-        /** Convenience factory for a DATA frame wrapping a raw IP packet. */
+        /** Convenience factory for a DATA frame wrapping a raw Ethernet frame. */
         fun data(packet: ByteArray): Frame = Frame(FrameType.DATA, packet)
 
         /** Convenience factory for a KEEPALIVE frame (empty payload). */

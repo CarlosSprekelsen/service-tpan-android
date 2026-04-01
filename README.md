@@ -4,7 +4,7 @@ Android TPAN client service for TT and TWT EUDs.
 
 `service-tpan-android` is a mission-agnostic foreground service that persists
 USB commission state, bonds to the Hub over Bluetooth, and provides the TPAN
-framed-IP data path through Android `VpnService`. USB is always preferred over
+framed Ethernet data path through a root TAP device (JNI). USB is always preferred over
 Bluetooth in this pass; UWB and WiFi remain future transports.
 
 Authoritative design reference:
@@ -21,7 +21,7 @@ Authoritative design reference:
 |  |  UsbNetworkMonitor  -> UsbCommissionClient -> Provisioning    |  |
 |  |          |                                   Store            |  |
 |  |          v                                                     |  |
-|  |     BondManager  -> BtTransport -> ConnectionManager -> VPN   |  |
+|  |     BondManager  -> BtTransport -> ConnectionManager -> TAP  |  |
 |  |                                            ^            |      |  |
 |  |                                            +-- FrameCodec --+  |  |
 |  +---------------------------------------------------------------+  |
@@ -48,7 +48,8 @@ service-tpan-android/
 |   |   +-- BondManager.kt                # Bond maintenance and pairing assist
 |   |   +-- LocalBluetoothIdentityProvider.kt
 |   +-- transport/BtTransport.kt          # RFCOMM SPP transport
-|   +-- vpn/VpnEngine.kt                  # Android VpnService TUN lifecycle
+|   +-- tap/TapEngine.kt                  # Root TAP device lifecycle (JNI)
+|   +-- vpn/VpnEngine.kt                  # DEPRECATED — retained for git history
 +-- app/src/test/java/com/katim/dts/tpan/
     +-- codec/FrameCodecTest.kt
     +-- provision/UsbCommissionRecordTest.kt
@@ -67,7 +68,7 @@ Persisted commission state contains:
 - `pairingPasskey`
 - `localEud.btMac`
 - `localEud.role`
-- `localEud.tunAddress`
+- `localEud.tapAddress`
 - `commissionedAt`
 
 Boot behavior:

@@ -24,7 +24,7 @@ data class UsbCommissionRecord(
     data class LocalEud(
         val btMac: String,
         val role: String,
-        val tunAddress: String
+        val tapAddress: String
     )
 
     companion object {
@@ -45,7 +45,7 @@ data class UsbCommissionRecord(
                 localEud = LocalEud(
                     btMac = local.getString("btMac"),
                     role = local.getString("role"),
-                    tunAddress = local.getString("tunAddress")
+                    tapAddress = local.getString("tapAddress")
                 ),
                 commissionedAt = root.getString("commissionedAt")
             )
@@ -68,8 +68,8 @@ data class UsbCommissionRecord(
             if (record.localEud.role !in listOf("tt", "twt")) {
                 errors += "localEud.role must be 'tt' or 'twt'"
             }
-            if (record.localEud.tunAddress.isBlank()) {
-                errors += "localEud.tunAddress is required"
+            if (record.localEud.tapAddress.isBlank()) {
+                errors += "localEud.tapAddress is required"
             }
             if (record.commissionedAt.isBlank()) {
                 errors += "commissionedAt is required"
@@ -97,7 +97,7 @@ data class UsbCommissionRecord(
                 JSONObject().apply {
                     put("btMac", localEud.btMac)
                     put("role", localEud.role)
-                    put("tunAddress", localEud.tunAddress)
+                    put("tapAddress", localEud.tapAddress)
                 }
             )
             put("commissionedAt", commissionedAt)

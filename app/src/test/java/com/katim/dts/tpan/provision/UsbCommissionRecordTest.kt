@@ -17,7 +17,7 @@ class UsbCommissionRecordTest {
           "localEud": {
             "btMac": "10:20:30:40:50:60",
             "role": "tt",
-            "tunAddress": "192.168.101.10"
+            "tapAddress": "192.168.101.10"
           },
           "commissionedAt": "2026-03-28T09:12:44Z"
         }
@@ -31,7 +31,7 @@ class UsbCommissionRecordTest {
         assertEquals("AA:BB:CC:DD:EE:FF", record.hub.btMac)
         assertEquals("53505000-0000-4000-8000-425400000001", record.hub.profileUuid)
         assertEquals("tt", record.localEud.role)
-        assertEquals("192.168.101.10", record.localEud.tunAddress)
+        assertEquals("192.168.101.10", record.localEud.tapAddress)
         assertEquals(123456, record.pairingPasskey)
     }
 

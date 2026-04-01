@@ -15,9 +15,9 @@ import java.util.UUID
  * Uses standard Android [BluetoothSocket] API — no PANU/BNEP dependency.
  *
  * RFCOMM traffic goes over the Bluetooth radio (L2CAP), not through the
- * IP routing table, so it is inherently not captured by the VPN TUN.
- * `VpnService.protect()` is therefore not required for BT, but IS required
- * for future WiFi (TCP) transports — see [TpanTransport] contract.
+ * IP routing table, so it is inherently not captured by the TAP device.
+ * No socket protection is required for BT. Future WiFi (TCP) transports
+ * may need routing rules to avoid capture — see [TpanTransport] contract.
  *
  * Error reporting: [IOException] on connect or during read/write is NOT
  * retried internally. The Bearer Monitor controls reconnection timing.
@@ -85,8 +85,8 @@ class BtTransport(
         }
 
         // Note: RFCOMM bypasses IP routing (L2CAP over BT radio), so
-        // VpnService.protect() is not needed. Future WiFi/TCP transports
-        // MUST call vpnEngine.protectSocket() before connecting.
+        // no socket protection is needed. Future WiFi/TCP transports
+        // may need routing rules to avoid TAP capture.
 
         socket = btSocket
         Log.i(TAG, "Connected to Hub $hubMac via RFCOMM")

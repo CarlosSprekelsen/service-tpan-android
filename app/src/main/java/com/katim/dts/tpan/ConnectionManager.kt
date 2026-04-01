@@ -4,7 +4,7 @@ import android.util.Log
 import com.katim.dts.tpan.codec.Frame
 import com.katim.dts.tpan.codec.FrameCodec
 import com.katim.dts.tpan.transport.TpanTransport
-import com.katim.dts.tpan.vpn.VpnEngine
+import com.katim.dts.tpan.tap.TapEngine
 import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.Executors
@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicLong
  * §Reconnection (lines 719–744).
  */
 class ConnectionManager(
-    private val vpnEngine: VpnEngine
+    private val tapEngine: TapEngine
 ) {
     companion object {
         private const val TAG = "ConnectionManager"
@@ -55,7 +55,7 @@ class ConnectionManager(
     // ── Data path (A701) ────────────────────────────────────────────────────
 
     /**
-     * Start the data path: VPN Engine read/write loops + keepalive timer.
+     * Start the data path: TAP Engine read/write loops + keepalive timer.
      */
     fun startDataPath(transport: TpanTransport) {
         if (running) stopDataPath()
@@ -70,12 +70,12 @@ class ConnectionManager(
             }
         }
 
-        // Register keepalive callback on VPN engine
+        // Register keepalive callback on TAP engine
         lastReceivedTimestamp.set(System.currentTimeMillis())
-        vpnEngine.onKeepaliveReceived = { onFrameReceived() }
+        tapEngine.onKeepaliveReceived = { onFrameReceived() }
 
-        // Start VPN Engine data-path loops
-        vpnEngine.startDataPath(transport.input, transport.output)
+        // Start TAP Engine data-path loops
+        tapEngine.startDataPath(transport.input, transport.output)
 
         // Start keepalive sender and link-dead checker
         startKeepaliveTimer()
@@ -84,7 +84,7 @@ class ConnectionManager(
     }
 
     /**
-     * Stop the data path. Does NOT close the VPN TUN (stays up for reconnect).
+     * Stop the data path. Does NOT close the TAP device (stays up for reconnect).
      */
     fun stopDataPath() {
         if (!running) return
@@ -92,8 +92,8 @@ class ConnectionManager(
 
         stopKeepaliveTimer()
         cancelReconnect()
-        vpnEngine.stopDataPath()
-        vpnEngine.onKeepaliveReceived = null
+        tapEngine.stopDataPath()
+        tapEngine.onKeepaliveReceived = null
         activeOutput = null
 
         Log.i(TAG, "Data path stopped")
@@ -161,7 +161,7 @@ class ConnectionManager(
 
     /**
      * Begin reconnection attempts with exponential backoff.
-     * VPN TUN stays active — apps see timeouts, not config changes.
+     * TAP device stays active — apps see timeouts, not config changes.
      */
     fun startReconnect() {
         if (!running && scheduler?.isShutdown != false) {

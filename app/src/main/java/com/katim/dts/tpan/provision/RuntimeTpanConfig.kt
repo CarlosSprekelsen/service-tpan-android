@@ -6,7 +6,7 @@ package com.katim.dts.tpan.provision
  */
 data class RuntimeTpanConfig(
     val role: String,
-    val tunAddress: String,
+    val tapAddress: String,
     val localBtMac: String,
     val hubBtMac: String,
     val hubProfileUuid: String,
@@ -16,7 +16,7 @@ data class RuntimeTpanConfig(
         fun fromCommission(record: UsbCommissionRecord): RuntimeTpanConfig =
             RuntimeTpanConfig(
                 role = record.localEud.role,
-                tunAddress = record.localEud.tunAddress,
+                tapAddress = record.localEud.tapAddress,
                 localBtMac = record.localEud.btMac,
                 hubBtMac = record.hub.btMac,
                 hubProfileUuid = record.hub.profileUuid,

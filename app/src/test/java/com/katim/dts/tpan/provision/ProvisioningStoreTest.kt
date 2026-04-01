@@ -15,7 +15,7 @@ class ProvisioningStoreTest {
 
     private fun record(
         role: String = "tt",
-        tunAddress: String = "192.168.101.10",
+        tapAddress: String = "192.168.101.10",
         hubMac: String = "AA:BB:CC:DD:EE:FF",
         localMac: String = "10:20:30:40:50:60",
         passkey: Int = 123456,
@@ -31,7 +31,7 @@ class ProvisioningStoreTest {
             localEud = UsbCommissionRecord.LocalEud(
                 btMac = localMac,
                 role = role,
-                tunAddress = tunAddress
+                tapAddress = tapAddress
             ),
             commissionedAt = commissionedAt
         )
@@ -67,7 +67,7 @@ class ProvisioningStoreTest {
     @Test
     fun `validateOnBoot recovers staged record`() {
         val (baseDir, store) = tempStore()
-        val staged = record(role = "twt", tunAddress = "192.168.101.20")
+        val staged = record(role = "twt", tapAddress = "192.168.101.20")
         val stagingFile = File(File(baseDir, ProvisioningStore.STAGING_DIR), ProvisioningStore.COMMISSION_FILENAME)
         stagingFile.parentFile?.mkdirs()
         stagingFile.writeText(staged.toJson())
