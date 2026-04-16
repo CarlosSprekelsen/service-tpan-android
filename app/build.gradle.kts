@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.katim.dts.tpan"
+    namespace = "com.katim.dts.service.tpan"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.katim.dts.tpan"
+        applicationId = "com.katim.dts.service.tpan"
         minSdk = 29
         targetSdk = 34
         versionCode = 1
@@ -54,3 +54,4 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
 }
+
