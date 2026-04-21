@@ -39,4 +39,13 @@ the TUNSETIFF ioctl with `IFF_TAP | IFF_NO_PI`. All other APIs are standard Andr
 ./gradlew assembleDebug
 ```
 
-NDK required for the TAP JNI bridge (`app/src/main/cpp/`). Otherwise pure Kotlin/Android SDK.
+Development builds use the Gradle path above.
+
+Production DTS image integration should follow the AOSP path:
+
+```bash
+m TpanService
+```
+
+The production build is expected to be platform-signed, privileged, and paired with
+`privapp-permissions-tpan.xml`.

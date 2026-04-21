@@ -1,0 +1,43 @@
+android_app {
+    name: "TpanService",
+    manifest: "app/src/main/AndroidManifest.xml",
+    srcs: [
+        "app/src/main/java/**/*.kt",
+    ],
+    privileged: true,
+    certificate: "platform",
+    platform_apis: true,
+    jni_libs: [
+        "libtpan_tap",
+    ],
+    static_libs: [
+        "kotlin-stdlib",
+    ],
+    optimize: {
+        enabled: false,
+    },
+    required: [
+        "privapp-permissions-tpan",
+    ],
+}
+
+cc_library_shared {
+    name: "libtpan_tap",
+    srcs: [
+        "app/src/main/cpp/tap_jni.c",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+    header_libs: [
+        "jni_headers",
+    ],
+    stl: "none",
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-tpan",
+    src: "privapp-permissions-tpan.xml",
+    sub_dir: "permissions",
+    filename_from_src: true,
+}

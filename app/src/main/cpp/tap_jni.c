@@ -26,7 +26,7 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 
 JNIEXPORT jint JNICALL
-Java_com_katim_dts_tpan_tap_TapEngine_nativeCreateTap(
+Java_com_katim_dts_service_tpan_tap_TapEngine_nativeCreateTap(
         JNIEnv *env, jobject thiz, jstring device_name)
 {
     int fd = open("/dev/net/tun", O_RDWR);

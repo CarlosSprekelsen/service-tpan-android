@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<permissions>
+    <privapp-permissions package="com.katim.dts.service.tpan">
+        <permission name="android.permission.BLUETOOTH_PRIVILEGED" />
+        <permission name="android.permission.LOCAL_MAC_ADDRESS" />
+    </privapp-permissions>
+</permissions>

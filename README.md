@@ -7,6 +7,19 @@ USB commission state, bonds to the Hub over Bluetooth, and provides the TPAN
 framed Ethernet data path through a root TAP device (JNI). USB is always preferred over
 Bluetooth in this pass; UWB and WiFi remain future transports.
 
+## Package identity
+
+- Android package: `com.katim.dts.service.tpan`
+- Main service class: `com.katim.dts.service.tpan.TpanService`
+- Boot receiver: `com.katim.dts.service.tpan.TpanBootReceiver`
+
+## Build model
+
+- Development path: Gradle app module for local debug and unit-test workflows
+- Production path: AOSP-integrated privileged app via `Android.bp`
+- Production signing: shared DTS platform certificate (`certificate: "platform"`)
+- Production permission policy: `privapp-permissions-tpan.xml`
+
 Authoritative design reference:
 [`docs/swad-dts/designs/svc-tpan-architecture.md`](../../docs/swad-dts/designs/svc-tpan-architecture.md)
 
@@ -33,7 +46,7 @@ Authoritative design reference:
 
 ```text
 service-tpan-android/
-+-- app/src/main/java/com/katim/dts/tpan/
++-- app/src/main/java/com/katim/dts/service/tpan/
 |   +-- TpanService.kt                    # Foreground service orchestrator
 |   +-- TpanBootReceiver.kt               # Boot start from commission state
 |   +-- ConnectionManager.kt              # KEEPALIVE, SHUTDOWN, reconnect backoff
@@ -50,7 +63,7 @@ service-tpan-android/
 |   +-- transport/BtTransport.kt          # RFCOMM SPP transport
 |   +-- tap/TapEngine.kt                  # Root TAP device lifecycle (JNI)
 |   +-- vpn/VpnEngine.kt                  # DEPRECATED — retained for git history
-+-- app/src/test/java/com/katim/dts/tpan/
++-- app/src/test/java/com/katim/dts/service/tpan/
     +-- codec/FrameCodecTest.kt
     +-- provision/UsbCommissionRecordTest.kt
     +-- provision/ProvisioningStoreTest.kt
@@ -115,8 +128,24 @@ Dev fallback:
 ./gradlew testDebugUnitTest
 ```
 
-No NDK is required. The project is Kotlin-only with `compileSdk 34`, `minSdk 29`,
-and Java 17 toolchains.
+The local development path requires the Android NDK for the TAP JNI bridge in
+`app/src/main/cpp/`.
+
+Production DTS image integration uses:
+
+```bash
+# In AOSP root
+m TpanService
+```
+
+Production integration notes:
+
+- Include `TpanService` through `PRODUCT_PACKAGES`.
+- Deploy `privapp-permissions-tpan.xml` under `etc/permissions/`.
+- Sign the production image build with the shared DTS platform certificate.
+
+The Gradle path remains the development workflow. The production delivery path is the
+AOSP-integrated privileged app.
 
 ## Status
 
