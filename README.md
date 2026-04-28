@@ -6,20 +6,21 @@ Android EUD access reference service for TT and TWT EUDs.
 >
 > This module is the DTS/TWT client-side reference for a privileged Android
 > system service that can create and route through a TAP interface. The earlier
-> Bluetooth RFCOMM/SPP path was a risk-reduction prototype and is no longer the
-> target contract. The target KATIM TNN architecture is TNN-owned multi-bearer
-> EUD access over UWB with TAP/L2 or an equivalent transparent data plane, plus
-> any bearer policy JC/TNN freezes. TPAN is the TNN device
+> Bluetooth RFCOMM/SPP path is working reference material for IP-over-SPP and is
+> not retired for KATIM TNN. The target KATIM TNN architecture is TNN-owned
+> multi-bearer EUD access over UWB and/or BT SPP with TAP/L2 or an equivalent
+> transparent data plane, plus any bearer policy JC/TNN freezes. TPAN is the TNN device
 > authentication/authorization framework unless JC/TNN explicitly names the
 > data plane TPAN.
 > INVISIO wireless continuity is handled by the agreed interim WiFi profile,
-> not by Bluetooth-over-IP.
+> not by this reference Bluetooth-over-IP container path.
 
 `service-tpan-android` is a mission-agnostic foreground service that persists
 USB commission state and provides the framed Ethernet data path through a
-root TAP device (JNI). Current code still contains the deprecated Bluetooth
-RFCOMM prototype transport; the target TNN integration must bind the same TAP
-and framing model to the TNN-owned access data-plane contract.
+root TAP device (JNI). Current code contains the Bluetooth RFCOMM prototype
+transport as TNN-shareable reference code; the target TNN
+integration must bind the same TAP and framing model to the TNN-owned access
+data-plane contract.
 
 ## Package identity
 
@@ -74,7 +75,7 @@ service-tpan-android/
 |   |   +-- UsbCommissionClient.kt        # POST /api/v1/commission/usb
 |   |   +-- BondManager.kt                # Bond maintenance and pairing assist
 |   |   +-- LocalBluetoothIdentityProvider.kt
-|   +-- transport/BtTransport.kt          # Deprecated RFCOMM SPP prototype transport
+|   +-- transport/BtTransport.kt          # RFCOMM SPP IP-over-SPP reference transport
 |   +-- tap/TapEngine.kt                  # Root TAP device lifecycle (JNI)
 |   +-- vpn/VpnEngine.kt                  # DEPRECATED — retained for git history
 +-- app/src/test/java/com/katim/dts/service/tpan/
@@ -128,10 +129,10 @@ Dev fallback:
 
 ## Bearer and Platform Rules
 
-- Current prototype bearer behavior is fixed to `USB > BT`; this is deprecated
-  and must not be used as the target TNN contract.
-- Target TNN access behavior must be agreed with JC/TNN, with UWB carrying the
-  TAP/L2 data plane, or an equivalent transparent data plane, and
+- Current prototype bearer behavior is fixed to `USB > BT`; this remains useful
+  reference behavior, but production priority and ownership belong to TNN.
+- Target TNN access behavior must be agreed with JC/TNN, with UWB and/or BT SPP
+  carrying the TAP/L2 data plane, or an equivalent transparent data plane, and
   multicast/IGMPv3 mandatory.
 - When USB is stable, VPN is deactivated and traffic stays on USB.
 - When USB drops, the service activates the access TAP. The active wireless
@@ -177,7 +178,7 @@ AOSP-integrated privileged app.
 | LocalBluetoothIdentityProvider | Implemented | Privileged MAC path plus dev override |
 | BondManager | Implemented | Hub bond replacement and pairing confirmation |
 | VPN Engine | Implemented | Stable TUN addressing and framed IP relay |
-| BT transport | Deprecated prototype | RFCOMM SPP risk-reduction path only |
+| BT transport | Reference implementation | RFCOMM SPP IP-over-SPP path for TNN review/adaptation |
 | Connection Manager | Implemented | KEEPALIVE, SHUTDOWN, reconnect backoff |
 | UWB transport | Target contract | To be provided by the TNN-owned access platform service; TPAN may authorize the path |
 | WiFi transport | Planned | Not implemented in this pass |
