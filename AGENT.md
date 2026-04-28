@@ -8,9 +8,9 @@ This module is now a DTS/TWT client-side reference for the TNN access
 alignment. Bluetooth RFCOMM/SPP code in this tree is working reference material
 for a TNN-owned IP-over-SPP bearer, especially for TWT if TNN resources allow.
 New work must preserve the TAP/L2 client model and align the real bearer with
-the TNN-owned multi-bearer EUD access service agreed with JC/TNN. TPAN is the
-TNN device authentication/authorization framework unless JC/TNN explicitly
-names the data plane TPAN.
+the TNN-owned multi-bearer EUD access service defined by the TNN platform
+authority. TPAN is the TNN device authentication/authorization framework unless
+that authority explicitly defines a broader access data-plane naming scope.
 
 ## Architecture Summary
 

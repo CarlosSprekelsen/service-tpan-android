@@ -9,9 +9,9 @@ Android EUD access reference service for TT and TWT EUDs.
 > Bluetooth RFCOMM/SPP path is working reference material for IP-over-SPP and is
 > not retired for KATIM TNN. The target KATIM TNN architecture is TNN-owned
 > multi-bearer EUD access over UWB and/or BT SPP with TAP/L2 or an equivalent
-> transparent data plane, plus any bearer policy JC/TNN freezes. TPAN is the TNN device
-> authentication/authorization framework unless JC/TNN explicitly names the
-> data plane TPAN.
+> transparent data plane under TNN platform policy. TPAN is the TNN device
+> authentication/authorization framework unless the TNN platform authority
+> explicitly defines a broader access data-plane naming scope.
 > INVISIO wireless continuity is handled by the agreed interim WiFi profile,
 > not by this reference Bluetooth-over-IP container path.
 
@@ -131,10 +131,10 @@ Dev fallback:
 
 - Current prototype bearer behavior is fixed to `USB > BT`; this remains useful
   reference behavior, but production priority and ownership belong to TNN.
-- Target TNN access behavior must be agreed with JC/TNN, with UWB and/or BT SPP
+- Target TNN access behavior must be defined by the TNN platform authority, with UWB and/or BT SPP
   carrying the TAP/L2 data plane, or an equivalent transparent data plane, and
   multicast/IGMPv3 mandatory.
-- When USB is stable, VPN is deactivated and traffic stays on USB.
+- When USB is stable, the wireless access TAP path remains inactive and traffic stays on USB.
 - When USB drops, the service activates the access TAP. The active wireless
   transport must be supplied by the TNN platform contract.
 - Same-EUD re-commission can rotate stored credentials without forcing a new
@@ -177,7 +177,7 @@ AOSP-integrated privileged app.
 | UsbCommissionClient | Implemented | Hub USB commission POST over bound `Network` |
 | LocalBluetoothIdentityProvider | Implemented | Privileged MAC path plus dev override |
 | BondManager | Implemented | Hub bond replacement and pairing confirmation |
-| VPN Engine | Implemented | Stable TUN addressing and framed IP relay |
+| VpnEngine | Deprecated reference | Legacy TUN path retained for git history; target service uses TAP |
 | BT transport | Reference implementation | RFCOMM SPP IP-over-SPP path for TNN review/adaptation |
 | Connection Manager | Implemented | KEEPALIVE, SHUTDOWN, reconnect backoff |
 | UWB transport | Target contract | To be provided by the TNN-owned access platform service; TPAN may authorize the path |
